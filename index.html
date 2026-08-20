@@ -147,6 +147,7 @@ body.is-reading .page-hint { opacity: 1; }
   .independent-note { display: none; }
 }
 </style>
+<base target="_blank">
 </head>
 <body class="is-browsing">
 
@@ -157,7 +158,7 @@ body.is-reading .page-hint { opacity: 1; }
 
 <div id="stage">
   <canvas id="scene" class="shelf-canvas" role="application" tabindex="0"
-    aria-label="Interactive three-dimensional shelf of eight Thok Nath volumes. Use wheel or arrow keys to browse. Click a cover to inspect. Press Escape to return."></canvas>
+    aria-label="Interactive three-dimensional shelf of eight Thok Nath volumes. All books are visible. Use arrow keys to select. Click a cover to inspect. Press Escape to return."></canvas>
 </div>
 
 <header class="site-header">
@@ -172,7 +173,7 @@ body.is-reading .page-hint { opacity: 1; }
 
 <div class="help-card" id="helpCard" role="dialog" aria-label="How to browse">
   <div class="h-title">How to browse</div>
-  <div><b>Wheel</b> or <b>Arrow keys</b> — move along the shelf</div>
+  <div><b>Arrow keys</b> — select a book</div>
   <div><b>Click a cover</b> — pull it forward to inspect</div>
   <div><b>Click cover</b> in inspect — open the book</div>
   <div><b>Drag</b> on open pages — turn pages</div>
@@ -192,7 +193,7 @@ body.is-reading .page-hint { opacity: 1; }
 
 <nav class="shelf-index" aria-label="Catalog position">
   <div class="shelf-index__ticks" id="dots"></div>
-  <div class="input-hint" aria-hidden="true"><span>WHEEL</span><i></i><span>ARROWS</span><i></i><span>CLICK</span></div>
+  <div class="input-hint" aria-hidden="true"><span>ARROWS</span><i></i><span>CLICK</span><i></i><span>ESC</span></div>
 </nav>
 
 <aside class="book-details" id="panel" aria-label="Book details">
@@ -835,6 +836,9 @@ function createBook(bookData, index, xPosition, shelfTop, renderer) {
 /* ========================================================================
    SHELF ENGINE
    ======================================================================== */
+/* ========================================================================
+   SHELF ENGINE — All books visible
+   ======================================================================== */
 class ShelfEngine {
   constructor(canvas, callbacks) {
     this.canvas = canvas;
@@ -842,9 +846,6 @@ class ShelfEngine {
     this.state = STATES.BROWSE;
     this.activeIndex = 0;
     this.selectedIndex = null;
-    this.presentedIndex = 0;
-    this.scrollIndex = 0;
-    this.targetScrollIndex = 0;
     this.focusProgress = 0;
     this.lastInputTime = 0;
     this.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -874,12 +875,12 @@ class ShelfEngine {
 
     // Scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x1a1410, 6, 20);
+    this.scene.fog = new THREE.Fog(0x1a1410, 8, 24);
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(28, 1, 0.08, 50);
-    this.browseCameraPos = new THREE.Vector3(0, 1.15, 5.8);
-    this.browseTarget = new THREE.Vector3(0, 0.95, 0.1);
+    // Camera — positioned to see all 8 books
+    this.camera = new THREE.PerspectiveCamera(32, 1, 0.08, 50);
+    this.browseCameraPos = new THREE.Vector3(0, 2.0, 7.5);
+    this.browseTarget = new THREE.Vector3(0, 1.1, 0);
     this.camera.position.copy(this.browseCameraPos);
     this.camera.lookAt(this.browseTarget);
 
@@ -890,8 +891,8 @@ class ShelfEngine {
     this.controls.enablePan = true;
     this.controls.enableZoom = true;
     this.controls.enabled = false;
-    this.controls.minDistance = 2;
-    this.controls.maxDistance = 8;
+    this.controls.minDistance = 3;
+    this.controls.maxDistance = 12;
     this.controls.target.copy(this.browseTarget);
 
     // Groups
@@ -912,29 +913,33 @@ class ShelfEngine {
   }
 
   setupLights() {
-    const hemi = new THREE.HemisphereLight(0xfff8ea, 0x3e2a1d, 1.6);
+    const hemi = new THREE.HemisphereLight(0xfff8ea, 0x3e2a1d, 1.4);
     this.scene.add(hemi);
 
-    const key = new THREE.DirectionalLight(0xfff6e7, 1.4);
-    key.position.set(-3.5, 6, 4.5);
+    const key = new THREE.DirectionalLight(0xfff6e7, 1.2);
+    key.position.set(-2, 7, 5);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.left = -6; key.shadow.camera.right = 6;
-    key.shadow.camera.top = 5; key.shadow.camera.bottom = -2;
+    key.shadow.camera.left = -5; key.shadow.camera.right = 5;
+    key.shadow.camera.top = 4; key.shadow.camera.bottom = -1;
     key.shadow.bias = -0.0004;
     this.scene.add(key);
 
-    const rim = new THREE.DirectionalLight(0xc8d5e5, 0.6);
-    rim.position.set(4, 2.5, -3);
+    const fill = new THREE.DirectionalLight(0xd4c4a8, 0.5);
+    fill.position.set(3, 3, 2);
+    this.scene.add(fill);
+
+    const rim = new THREE.DirectionalLight(0xc8d5e5, 0.4);
+    rim.position.set(4, 2, -3);
     this.scene.add(rim);
 
-    const bounce = new THREE.PointLight(0xd79b72, 0.45, 10, 2);
-    bounce.position.set(-2.5, 0.3, 2.5);
+    const bounce = new THREE.PointLight(0xd79b72, 0.35, 12, 2);
+    bounce.position.set(0, 0.5, 3);
     this.scene.add(bounce);
 
     // Ground
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(28, 14),
+      new THREE.PlaneGeometry(30, 16),
       new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.96, metalness: 0 })
     );
     ground.rotation.x = -Math.PI / 2;
@@ -944,28 +949,43 @@ class ShelfEngine {
   }
 
   createShelf() {
-    const shelfWidth = 10;
+    // Calculate total shelf width based on books
+    const totalWidth = BOOKS.reduce((sum, b) => sum + b.thickness, 0) + (BOOKS.length - 1) * SHELF.gap + 1.0;
     const woodTex = toTexture(makeWoodTexture(512, 128), this.renderer);
     const plankMat = new THREE.MeshStandardMaterial({
       map: woodTex, color: 0x5a4132, roughness: 0.6, metalness: 0.03
     });
 
-    const plank = new THREE.Mesh(new THREE.BoxGeometry(shelfWidth, 0.16, 1.35), plankMat);
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(totalWidth, 0.16, 1.4), plankMat);
     plank.position.set(0, SHELF.top - 0.12, 0);
     plank.castShadow = true; plank.receiveShadow = true;
     this.shelfGroup.add(plank);
 
     const edge = new THREE.Mesh(
-      new THREE.BoxGeometry(shelfWidth, 0.1, 0.12),
+      new THREE.BoxGeometry(totalWidth, 0.1, 0.12),
       new THREE.MeshStandardMaterial({ color: 0x4b3429, roughness: 0.5, metalness: 0.05 })
     );
     edge.position.set(0, SHELF.top - 0.06, 0.68);
     edge.castShadow = true;
     this.shelfGroup.add(edge);
+
+    // Back wall (subtle)
+    const backWall = new THREE.Mesh(
+      new THREE.PlaneGeometry(totalWidth + 2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x241c16, roughness: 0.95 })
+    );
+    backWall.position.set(0, 2.5, -0.8);
+    backWall.receiveShadow = true;
+    this.shelfGroup.add(backWall);
   }
 
   createBooks() {
-    let cursor = -2.5;
+    // Calculate fixed positions centered at x=0
+    const totalThickness = BOOKS.reduce((sum, b) => sum + b.thickness, 0);
+    const totalGaps = (BOOKS.length - 1) * SHELF.gap;
+    const totalWidth = totalThickness + totalGaps;
+    let cursor = -totalWidth / 2;
+
     BOOKS.forEach((bookData, index) => {
       cursor += bookData.thickness * 0.5;
       const book = createBook(bookData, index, cursor, SHELF.top, this.renderer);
@@ -975,14 +995,20 @@ class ShelfEngine {
       cursor += bookData.thickness * 0.5 + SHELF.gap;
     });
 
-    // Set initial poses
+    // Set initial poses — all shelved, active one slightly forward
     this.books.forEach((book, i) => {
-      this.setBookPose(book, i === 0 ? this.presentedPose() : this.shelvedPose(), false);
+      this.setBookPose(book, this.shelvedPose(i === 0), false);
     });
   }
 
-  shelvedPose() {
-    return { x: 0, z: SHELF.z, yaw: Math.PI / 2, scale: 1 };
+  shelvedPose(isActive) {
+    // Active book pulled slightly forward for visibility
+    return { 
+      x: 0, 
+      z: isActive ? -0.35 : SHELF.z, 
+      yaw: Math.PI / 2, 
+      scale: isActive ? 1.02 : 1 
+    };
   }
 
   presentedPose() {
@@ -992,10 +1018,10 @@ class ShelfEngine {
   inspectPose() {
     const isMobile = this.canvas.clientWidth < 760;
     return {
-      x: isMobile ? 0 : -0.45,
-      z: isMobile ? 1.35 : SHELF.inspectZ,
+      x: isMobile ? 0 : -0.4,
+      z: isMobile ? 1.2 : 1.45,
       yaw: 0,
-      scale: isMobile ? 1.15 : SHELF.inspectScale
+      scale: isMobile ? 1.1 : 1.25
     };
   }
 
@@ -1024,13 +1050,8 @@ class ShelfEngine {
   handleWheel(e) {
     if (this.state === STATES.READING) { e.preventDefault(); return; }
     if (this.state !== STATES.BROWSE) return;
+    // Wheel does nothing in browse mode now — all books are visible
     e.preventDefault();
-    const dominant = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    this.targetScrollIndex = THREE.MathUtils.clamp(
-      this.targetScrollIndex + dominant * 0.0025,
-      0, this.books.length - 1
-    );
-    this.lastInputTime = performance.now();
   }
 
   handlePointerDown(e) {
@@ -1051,7 +1072,6 @@ class ShelfEngine {
       this.pointerLastX = e.clientX;
       this.pointerTravel = 0;
 
-      // Check if clicking on book cover
       this.updatePointer(e);
       const hit = this.raycastBook();
       if (hit !== null && hit === this.selectedIndex) {
@@ -1073,7 +1093,6 @@ class ShelfEngine {
         const delta = e.clientX - this.pointerLastX;
         this.pointerLastX = e.clientX;
         this.pointerTravel += Math.abs(delta);
-        // No drag-based shelf navigation — wheel only
         this.canvas.classList.add("is-dragging");
         return;
       }
@@ -1085,7 +1104,6 @@ class ShelfEngine {
       const book = this.books[this.selectedIndex];
 
       if (this.state === STATES.INSPECT_CLOSED) {
-        // Hover crack-open
         const hit = this.raycastBook();
         book.targetCoverCrack = (hit === this.selectedIndex) ? 1 : 0;
       }
@@ -1095,16 +1113,11 @@ class ShelfEngine {
         this.pointerLastX = e.clientX;
         this.pointerTravel += Math.abs(delta);
 
-        // Page turning drag
-        const book = this.books[this.selectedIndex];
         const page = book.pages[book.currentPageIndex];
         if (page) {
-          const dragAmount = (e.clientX - this.pageDragStartX) / (this.canvas.clientWidth * 0.4);
           if (delta < -2) {
-            // Dragging left — turn page forward
             page.targetTurnProgress = THREE.MathUtils.clamp(page.targetTurnProgress + 0.03, 0, 1);
           } else if (delta > 2) {
-            // Dragging right — turn page backward
             page.targetTurnProgress = THREE.MathUtils.clamp(page.targetTurnProgress - 0.03, 0, 1);
           }
         }
@@ -1156,20 +1169,17 @@ class ShelfEngine {
 
   handleKeyDown(e) {
     if (e.key === "Escape") {
-      if (this.state === STATES.READING) {
-        this.closeBook();
-      } else if (this.state === STATES.INSPECT_CLOSED) {
-        this.returnToShelf();
-      }
+      if (this.state === STATES.READING) { this.closeBook(); }
+      else if (this.state === STATES.INSPECT_CLOSED) { this.returnToShelf(); }
       return;
     }
 
     if (this.state !== STATES.BROWSE) return;
 
-    if (e.key === "ArrowRight") { e.preventDefault(); this.browseBy(1); }
-    else if (e.key === "ArrowLeft") { e.preventDefault(); this.browseBy(-1); }
-    else if (e.key === "Home") { e.preventDefault(); this.browseTo(0); }
-    else if (e.key === "End") { e.preventDefault(); this.browseTo(this.books.length - 1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); this.selectNext(1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); this.selectNext(-1); }
+    else if (e.key === "Home") { e.preventDefault(); this.selectNext(-this.activeIndex); }
+    else if (e.key === "End") { e.preventDefault(); this.selectNext(this.books.length - 1 - this.activeIndex); }
     else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.openBook(this.activeIndex); }
   }
 
@@ -1191,26 +1201,13 @@ class ShelfEngine {
     this.canvas.style.cursor = hit === null ? "grab" : "pointer";
   }
 
-  xAtIndex(index) {
-    const lower = Math.floor(index);
-    const upper = Math.min(this.books.length - 1, Math.ceil(index));
-    const frac = index - lower;
-    return THREE.MathUtils.lerp(
-      this.books[lower] ? this.books[lower].x : 0,
-      this.books[upper] ? this.books[upper].x : 0,
-      frac
-    );
-  }
-
-  browseBy(delta) {
+  selectNext(delta) {
     if (this.state !== STATES.BROWSE) return;
-    this.browseTo(THREE.MathUtils.clamp(this.activeIndex + delta, 0, this.books.length - 1));
-  }
-
-  browseTo(index) {
-    if (this.state !== STATES.BROWSE) return;
-    this.targetScrollIndex = THREE.MathUtils.clamp(index, 0, this.books.length - 1);
-    this.lastInputTime = performance.now();
+    const newIndex = THREE.MathUtils.clamp(this.activeIndex + delta, 0, this.books.length - 1);
+    if (newIndex !== this.activeIndex) {
+      this.activeIndex = newIndex;
+      this.callbacks.onActiveIndex(this.activeIndex);
+    }
   }
 
   openBook(index) {
@@ -1226,7 +1223,6 @@ class ShelfEngine {
     if (this.state !== STATES.READING) return;
     const book = this.books[this.selectedIndex];
     book.targetBookOpen = 0;
-    // Reset all pages
     book.pages.forEach(p => p.targetTurnProgress = 0);
     book.currentPageIndex = 0;
     this.setState(STATES.INSPECT_CLOSED);
@@ -1234,9 +1230,7 @@ class ShelfEngine {
 
   returnToShelf() {
     if (this.state !== STATES.INSPECT_CLOSED && this.state !== STATES.READING) return;
-    if (this.state === STATES.READING) {
-      this.closeBook();
-    }
+    if (this.state === STATES.READING) { this.closeBook(); }
     this.setState(STATES.CLOSING);
     this.callbacks.onStatus("Returning to shelf");
   }
@@ -1252,7 +1246,6 @@ class ShelfEngine {
   setState(newState) {
     const oldState = this.state;
     this.state = newState;
-
     document.body.className = "is-" + newState;
 
     if (newState === STATES.INSPECT_CLOSED || newState === STATES.READING) {
@@ -1283,13 +1276,7 @@ class ShelfEngine {
   }
 
   updateState(dt, timestamp) {
-    const lambda = this.reducedMotion ? 20 : 10;
-
     if (this.state === STATES.BROWSE) {
-      if (!this.pointerDown && timestamp - this.lastInputTime > 140) {
-        this.targetScrollIndex = damp(this.targetScrollIndex, Math.round(this.targetScrollIndex), this.reducedMotion ? 18 : 8.5, dt);
-      }
-      this.scrollIndex = damp(this.scrollIndex, this.targetScrollIndex, lambda, dt);
       this.focusProgress = damp(this.focusProgress, 0, 10, dt);
       this.camera.position.lerp(this.browseCameraPos, 1 - Math.exp(-(this.reducedMotion ? 18 : 7) * dt));
       this.camera.lookAt(this.browseTarget);
@@ -1298,7 +1285,6 @@ class ShelfEngine {
       const duration = this.reducedMotion ? 0.3 : TIMING.focusIn;
       this.focusProgress = THREE.MathUtils.clamp(this.focusProgress + dt / duration, 0, 1);
 
-      // Reparent selected book to detail group when starting
       if (this.focusProgress < 0.05 && this.selectedIndex !== null) {
         const book = this.books[this.selectedIndex];
         if (book.root.parent !== this.detailGroup) {
@@ -1324,11 +1310,10 @@ class ShelfEngine {
       this.camera.lookAt(this.browseTarget);
 
       if (this.focusProgress <= 0) {
-        // Reparent back to shelf
         if (this.selectedIndex !== null) {
           const book = this.books[this.selectedIndex];
           this.shelfGroup.attach(book.root);
-          this.setBookPose(book, this.presentedPose());
+          this.setBookPose(book, this.shelvedPose(this.activeIndex === this.selectedIndex));
           book.targetCoverCrack = 0;
           book.coverCrack = 0;
         }
@@ -1336,22 +1321,13 @@ class ShelfEngine {
         this.callbacks.onStatus("8 volumes ready");
       }
     }
-
-    // Update active index
-    const nextActive = THREE.MathUtils.clamp(Math.round(this.scrollIndex), 0, this.books.length - 1);
-    if (nextActive !== this.activeIndex) {
-      this.activeIndex = nextActive;
-      this.callbacks.onActiveIndex(this.activeIndex);
-    }
-
-    // Move shelf to center active book
-    this.shelfGroup.position.x = -this.xAtIndex(this.scrollIndex);
   }
 
   updateBooks(dt) {
     const motionFocus = this.state === STATES.CLOSING
       ? this.focusProgress
-      : (this.state === STATES.OPENING ? easeOutCubic(this.focusProgress) : (this.state === STATES.INSPECT_CLOSED || this.state === STATES.READING ? 1 : 0));
+      : (this.state === STATES.OPENING ? easeOutCubic(this.focusProgress) 
+        : (this.state === STATES.INSPECT_CLOSED || this.state === STATES.READING ? 1 : 0));
 
     const isMobile = this.canvas.clientWidth < 760;
     const inspectPose = this.inspectPose();
@@ -1361,10 +1337,8 @@ class ShelfEngine {
       const isActive = i === this.activeIndex;
 
       if (isSelected && (this.state === STATES.OPENING || this.state === STATES.INSPECT_CLOSED || this.state === STATES.READING || this.state === STATES.CLOSING)) {
-        // Animate to/from inspect pose
         const startPose = this.presentedPose();
         const endPose = inspectPose;
-
         const t = motionFocus;
         const pose = {
           x: lerp(startPose.x, endPose.x, t),
@@ -1374,7 +1348,6 @@ class ShelfEngine {
         };
         this.setBookPose(book, pose);
 
-        // Update OrbitControls target to follow book
         if (this.state === STATES.INSPECT_CLOSED || this.state === STATES.READING) {
           const targetX = book.root.position.x + pose.x;
           const targetY = SHELF.top + book.height * 0.5;
@@ -1382,24 +1355,27 @@ class ShelfEngine {
           this.controls.target.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.1);
         }
       } else if (this.state === STATES.BROWSE) {
-        // Shelf poses
-        if (isActive) {
-          this.setBookPose(book, this.presentedPose());
-        } else {
-          this.setBookPose(book, this.shelvedPose());
-        }
+        // All books visible — active one slightly forward
+        const targetPose = this.shelvedPose(isActive);
+        // Smooth transition between active/inactive poses
+        book.content.position.x = damp(book.content.position.x, targetPose.x, 8, dt);
+        book.content.position.z = damp(book.content.position.z, targetPose.z, 8, dt);
+        book.content.rotation.y = damp(book.content.rotation.y, targetPose.yaw, 8, dt);
+        const currentScale = book.content.scale.x;
+        const newScale = damp(currentScale, targetPose.scale, 8, dt);
+        book.content.scale.setScalar(newScale);
       }
 
       // Cover crack on hover (inspect closed only)
       if (this.state === STATES.INSPECT_CLOSED && isSelected) {
         book.coverCrack = damp(book.coverCrack, book.targetCoverCrack, 12, dt);
-        book.frontHinge.rotation.y = book.coverCrack * 0.18; // ~10 degrees
+        book.frontHinge.rotation.y = book.coverCrack * 0.18;
       } else {
         book.coverCrack = damp(book.coverCrack, 0, 12, dt);
         book.frontHinge.rotation.y = book.coverCrack * 0.18;
       }
 
-      // Book opening (reading state)
+      // Book opening
       if (this.state === STATES.READING && isSelected) {
         book.targetBookOpen = 1;
       } else if (this.state !== STATES.READING) {
@@ -1407,8 +1383,7 @@ class ShelfEngine {
       }
       book.bookOpenAmount = damp(book.bookOpenAmount, book.targetBookOpen, 6, dt);
 
-      // Front hinge opens the book
-      const openAngle = book.bookOpenAmount * 2.6; // ~150 degrees
+      const openAngle = book.bookOpenAmount * 2.6;
       if (book.bookOpenAmount > 0.01) {
         book.frontHinge.rotation.y = openAngle;
       }
@@ -1419,9 +1394,6 @@ class ShelfEngine {
       // Visibility
       const inBrowse = this.state === STATES.BROWSE;
       book.root.visible = inBrowse || isSelected;
-      if (inBrowse && !isSelected) {
-        book.root.visible = true;
-      }
     });
   }
 
@@ -1435,9 +1407,9 @@ class ShelfEngine {
     this.camera.updateProjectionMatrix();
 
     if (w < 760) {
-      this.browseCameraPos.set(0, 1.25, 7.2);
+      this.browseCameraPos.set(0, 2.2, 8.5);
     } else {
-      this.browseCameraPos.set(0, 1.15, 5.8);
+      this.browseCameraPos.set(0, 2.0, 7.5);
     }
   }
 
@@ -1447,7 +1419,6 @@ class ShelfEngine {
     this.renderer.dispose();
   }
 }
-
 /* ========================================================================
    UI CONTROLLER
    ======================================================================== */
@@ -1643,14 +1614,14 @@ function buildDots() {
     d.type = "button";
     d.setAttribute("aria-label", "Browse to " + b.title);
     d.title = b.title;
-    d.addEventListener("click", () => { if (engine) engine.browseTo(i); });
+    d.addEventListener("click", () => { if (engine) engine.selectNext(i - activeIndex); });
     dots.appendChild(d);
   });
 }
 
 function wireUI() {
-  document.getElementById("prevBtn").addEventListener("click", () => { if (engine) engine.browseBy(-1); });
-  document.getElementById("nextBtn").addEventListener("click", () => { if (engine) engine.browseBy(1); });
+  document.getElementById("prevBtn").addEventListener("click", () => { if (engine) engine.selectNext(-1); });
+  document.getElementById("nextBtn").addEventListener("click", () => { if (engine) engine.selectNext(1); });
   document.getElementById("inspectBtn").addEventListener("click", () => { if (engine) engine.openBook(activeIndex); });
   document.getElementById("panelClose").addEventListener("click", () => { if (engine) engine.returnToShelf(); });
   document.getElementById("resetView").addEventListener("click", () => { if (engine) engine.resetView(); });

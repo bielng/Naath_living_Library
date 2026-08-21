@@ -2,7 +2,7 @@
 
 > An independent, open-source, interactive 3D library for the **Thok Nath** (Nuer) language. Eight volumes of vocabulary, grammar, structures, and conversation live on a continuous 3D shelf. Pull any book forward to inspect it. Open it to read.
 
-![Naath Dayom](logo.png)
+![Naath Dayom](imag.png)
 
 ---
 
